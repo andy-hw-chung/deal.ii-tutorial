@@ -3,3 +3,7 @@ CMakeFiles
 CMakeFiles/**
 *.cmake
 Makefile
+*.eps
+*.vtu
+*.project
+*.cproject

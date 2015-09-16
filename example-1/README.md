@@ -1,4 +1,4 @@
-To compile:
+# Building projects
 
 1. Make sure the environment variable `DEAL_II_DIR` is set in the terminal environment (Hint: export the variable automatically each time you start the terminal by editing your `.bashrc` file. Add the line
 ```bash
