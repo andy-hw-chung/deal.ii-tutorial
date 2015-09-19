@@ -11,6 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <string>
 
 /** Use the deal.ii namespace for convenience */
@@ -18,124 +19,167 @@ using namespace dealii;
 
 /** Print the sentence "`name` is `t`" */
 template <typename T>
-void printIs(const std::string name, const T t) {
+void print_is(const std::string name, const T t) {
   std::cout << name << " is " << t << std::endl;
 }
 
 
-/** A class containing a deal.ii triangulation and some asscociated utility functions */
-template<int dim>
+/**************
+*
+*  Grid
+*
+**************/
+
+/** A class containing a deal.ii triangulation and some asscociated utility
+ * functions */
+template <int dim>
 class Grid {
+public:
+    /** The deal.ii traingulation object */
+    Triangulation<dim> triangulation;
 
- public:
- /** The deal.ii traingulation object */
- Triangulation<dim> triangulation;
+    /** Set the pointer to the manifold to the given one */
+    void setManifold(Manifold<dim>* m, bool onlyOnBoundary = false);
 
- /** A pointer to a manifold object used by the triangulation */
- Manifold<dim> *manifold;
+    /** Output the given grid  */
+    void output(const std::string& fileName);
 
- /** Set the pointer to the manifold to the given one */
- void setManifold(Manifold<dim> *m, bool onlyOnBoundary = false) {
-    // set the manifold id of each cell and face of the triangulation to the same number to indicate
-    // each cell and face share the same manifold description
-    if(onlyOnBoundary)
-      triangulation.set_all_manifold_ids_on_boundary(0);
-    else
-      triangulation.set_all_manifold_ids(0);
+    /** refine the mesh. Each cell is halved in size in each refinement iteration
+   */
+    void refineGlobal(const int& nRefinements);
 
-    // set each cell and face of the triangulation with manifold if 0 to have the given manifold description
-    triangulation.set_manifold (0, *m);
-    // save the pointer to the manifold
-    manifold = m;
-  }
+    /** the minumum dimeter of all cells in the mesh */
+    double h();
 
-
-
-  /** Output the given grid  */
-  void output(const std::string &fileName) {
-    std::ofstream out (fileName);
-    GridOut gridOut;
-    gridOut.write_vtu (triangulation, out);
-    std::cout << "Grid written to " << fileName << std::endl;
-    out.close();
-  }
-
-  /** refine the mesh. Each cell is halved in size in each refinement iteration */
- void refineGlobal(const int &nRefinements) {
-  triangulation.refine_global (nRefinements);
- }
-
- /** the minumum dimeter of all cells in the mesh */
- double h() {
-  double min_diameter =  std::numeric_limits<double>::max();
-  // get a triangulation cell iterator
-  typedef typename Triangulation<dim>::active_cell_iterator cellIterator;
-  // loop through each cell of the triangulation
-  for (cellIterator cell = triangulation.begin_active(); cell!=triangulation.end(); ++cell)
-        {
-          const double diameter = cell -> diameter();
-          if( diameter < min_diameter )
-            min_diameter = diameter;
-        }
-     return min_diameter;
-   }
-
-
+private:
+    /** A pointer to a manifold object used by the triangulation */
+    std::unique_ptr<Manifold<dim> > manifold;
 };
 
+template <int dim>
+void Grid<dim>::setManifold(Manifold<dim>* m, bool onlyOnBoundary)
+{
+    // set the manifold id of each cell and face of the triangulation to the same
+    // number to indicate
+    // each cell and face share the same manifold description
+    if (onlyOnBoundary)
+        triangulation.set_all_manifold_ids_on_boundary(0);
+    else
+        triangulation.set_all_manifold_ids(0);
+
+    // set each cell and face of the triangulation with manifold if 0 to have the
+    // given manifold description
+    triangulation.set_manifold(0, *m);
+    // save the pointer to the manifold
+    manifold = std::unique_ptr<Manifold<dim> > (m);
+}
+
+template <int dim>
+void Grid<dim>::output(const std::string& fileName)
+{
+    std::ofstream out(fileName);
+    GridOut gridOut;
+    gridOut.write_vtu(triangulation, out);
+    std::cout << "Grid written to " << fileName << std::endl;
+    out.close();
+}
+
+template <int dim>
+void Grid<dim>::refineGlobal(const int& nRefinements)
+{
+    triangulation.refine_global(nRefinements);
+}
+
+template <int dim>
+double Grid<dim>::h()
+{
+    double min_diameter = std::numeric_limits<double>::max();
+    // get a triangulation cell iterator
+    typedef typename Triangulation<dim>::active_cell_iterator cellIterator;
+    // loop through each cell of the triangulation
+    for (cellIterator cell = triangulation.begin_active();
+         cell != triangulation.end(); ++cell) {
+        const double diameter = cell->diameter();
+        if (diameter < min_diameter)
+            min_diameter = diameter;
+    }
+    return min_diameter;
+}
+
+/**************
+*
+*  Grid Factory
+*
+**************/
+
 /**
- * A class that generates Grid objects on request. The space dimension of the grids
+ * A class that generates Grid objects on request. The space dimension of the
+ * grids
  * is controlled by the template parameter.
  */
-template<int dim>
+template <int dim>
 class GridFactory {
+public:
+    Grid<dim> cubeGrid(const double& left, const double& right);
 
-  public:
+    /** Return a spherical shell grid */
+    Grid<dim> sphericalShellGrid(const Point<dim>& centre,
+        const double& innerRadius,
+        const double& outerRadius);
 
-  Grid<dim> cubeGrid ()
-  {
+    /** Return a spherical grid */
+    Grid<dim> sphereGrid(const Point<dim>& centre, const double& radius);
+};
+
+template <int dim>
+Grid<dim> GridFactory<dim>::cubeGrid(const double& left, const double& right)
+{
     Grid<dim> grid;
-    // use the deal.ii GridGenerator class to fill the triangulation with a hyper cube mesh
-    GridGenerator::hyper_cube (grid.triangulation);
+    // use the deal.ii GridGenerator class to fill the triangulation with a hyper
+    // cube mesh
+    GridGenerator::hyper_cube(grid.triangulation, left, right);
     return grid;
-  }
+}
 
-  /** Return a spherical shell grid */
-  Grid<dim> sphericalShellGrid (const Point<dim> &centre, const  double &innerRadius, const double &outerRadius)
-  {
+template <int dim>
+Grid<dim> GridFactory<dim>::sphericalShellGrid(const Point<dim>& centre,
+    const double& innerRadius,
+    const double& outerRadius)
+{
     Grid<dim> grid;
 
-    // use the deal.ii GridGenerator class to fill the triangulation with a hyper shell mesh
-    GridGenerator::hyper_shell (grid.triangulation, centre, innerRadius, outerRadius, 6);
+    // use the deal.ii GridGenerator class to fill the triangulation with a hyper
+    // shell mesh
+    GridGenerator::hyper_shell(grid.triangulation, centre, innerRadius,
+        outerRadius, 6);
 
     grid.setManifold(new SphericalManifold<dim>(centre));
 
     return grid;
-  }
+}
 
-  /** Return a spherical grid */
-  Grid<dim> sphereGrid (const Point<dim> &centre, const double &radius)
-  {
+template <int dim>
+Grid<dim> GridFactory<dim>::sphereGrid(const Point<dim>& centre,
+    const double& radius)
+{
     Grid<dim> grid;
 
-    // use the deal.ii GridGenerator class to fill the triangulation with a hyper shell mesh
-    GridGenerator::hyper_ball (grid.triangulation, centre, radius);
+    // use the deal.ii GridGenerator class to fill the triangulation with a hyper
+    // shell mesh
+    GridGenerator::hyper_ball(grid.triangulation, centre, radius);
 
     grid.setManifold(new SphericalManifold<dim>(centre), true);
 
     return grid;
-  }
+}
 
-
-
-};
 
 
 
 int main ()
 {
   // Set the dimension of the grids here
-  const int dim = 3;
+  const int dim = 2;
 
   // Set the number of refinements to make
   const int nRefinements = 3;
@@ -144,11 +188,13 @@ int main ()
   GridFactory<dim> gridFactory;
 
   // get a square grid
-  Grid<dim> cubeGrid = gridFactory.cubeGrid();
+  const double left = 0.;
+  const double right = 1.; 
+  Grid<dim> cubeGrid = gridFactory.cubeGrid(left, right);
   cubeGrid.refineGlobal(nRefinements);
   cubeGrid.output("square-grid.vtu");
 
-     printIs("Cube grid: h", cubeGrid.h());
+     print_is("Cube grid: h", cubeGrid.h());
 
 
   // create a cube triangulation object
@@ -161,14 +207,14 @@ int main ()
   sphereGrid.refineGlobal(nRefinements);
   sphereGrid.output("sphere-grid.vtu");
   
-     printIs("Sphere grid: h", sphereGrid.h());
+     print_is("Sphere grid: h", sphereGrid.h());
 
 
   Grid<dim> shellGrid = gridFactory.sphericalShellGrid(centre, innerRadius, outerRadius);
   shellGrid.refineGlobal(nRefinements);
   shellGrid.output("shell-grid.vtu");
 
-     printIs("Shell grid: h", shellGrid.h());
+     print_is("Shell grid: h", shellGrid.h());
 
 
 
