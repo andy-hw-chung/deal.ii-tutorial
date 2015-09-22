@@ -1,0 +1,59 @@
+set output directory = test
+
+subsection grid
+
+  # the dimension of the grid
+  set dimension = 3
+  
+  # shape is one of: cube, sphere, spherical shell
+  set shape = cube
+
+  # the number of global refinements to do
+  set number of refinements = 4
+
+  # cube is [left,right]^n, where n is the dimension
+  subsection cube
+
+    set left point = 0.
+
+    set right point = 1.
+ 	
+  end
+
+  subsection sphere
+
+    set radius = 1.
+
+  end
+
+  subsection spherical shell
+
+    set inner radius = .5
+
+    set outer radius = 1.
+
+  end
+
+end
+
+subsection finite elements 
+
+  # order of the piecewise polynomial shape functions
+  set polynomial order = 1
+
+end
+
+subsection numerics
+
+  # number of quadrature points for gaussian quadrature rule
+  set number of gaussian quadrate points = 2
+
+  subsection matrix solver
+  
+    set max number of iterations = 1000
+
+    set tolerance = 1e-12 
+
+    end
+  	
+end
